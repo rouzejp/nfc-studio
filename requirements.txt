@@ -1,0 +1,5 @@
+# Dépendances de NFC Studio
+# Le lecteur doit être compatible PC/SC (CCID) ; testé sur ACS ACR1552 1S.
+pyscard>=2.0
+ndeflib>=0.17
+# tkinter fait partie de Python : paquet python3-tk sous Linux, inclus sous Windows (python.org)

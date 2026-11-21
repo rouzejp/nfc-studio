@@ -1,0 +1,11 @@
+# vidages locaux et fichiers d'état
+dumps/
+*.mfd
+reglages-qidi.json
+gui-diagnostic.txt
+__pycache__/
+*.pyc
+venv/
+.venv/
+# captures et brouillons
+*.bak
