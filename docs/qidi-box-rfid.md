@@ -80,6 +80,23 @@ Les codes 9, 10, 15-17, 20-23, 28, 29, 35, 36, 46 et 48 ne sont pas documentés.
 | 11 | #1714B0 bleu foncé | 23 | #F28636 orange |
 | 12 | #CEC0FE lavande | 24 | #B87F2B bronze |
 
+### Changer le jeu de clés (et pourquoi certaines applis échouent)
+
+Sur une MIFARE Classic, la clé A n'est jamais lisible : une lecture du trailer renvoie des zéros à
+sa place. Ce n'est pas un signe de protection.
+
+Si une application Android affiche « clé protégée par un mot de passe » et `sector 1 AUTH FAILED`
+alors que le tag se lit très bien ailleurs, c'est qu'elle n'essaie qu'une seule clé. Les étiquettes
+QIDI d'origine sont en `D3F7D3F7D3F7` ; les vierges du commerce en `FFFFFFFFFFFF`. Les deux se
+ramènent à l'autre jeu :
+
+```
+--cli qidi-write --material … --color … --fix-keys ffff   # revenir aux clés d'usine
+--cli qidi-write --material … --color … --fix-keys d3f7   # imiter une étiquette d'origine
+```
+
+Dans l'interface, deux boutons : « Écrire + clés D3F7 » et « Écrire + clés FFFF ».
+
 ## Où coller l'étiquette
 
 Le lecteur est intégré à la box, au niveau du support de bobine : l'antenne est juste derrière la

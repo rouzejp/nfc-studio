@@ -28,7 +28,8 @@ Lecture et écriture de tags NFC et de cartes MIFARE Classic via PC/SC, avec un 
 - lecture et écriture du bloc 4 (secteur 1) : code matériau, code couleur, code fabricant ;
 - 35 matériaux et 24 couleurs QIDI en listes déroulantes, avec pastille de couleur ;
 - champ « couleur mesurée » qui accepte un `#RRGGBB` et choisit la teinte QIDI la plus proche ;
-- réécriture optionnelle des clés du secteur 1 en `D3F7D3F7D3F7` (clé NDEF du NFC Forum).
+- réécriture optionnelle du trailer du secteur 1, au choix en `D3F7D3F7D3F7` (clé NDEF du NFC Forum,
+  comme les étiquettes d'origine) ou en `FFFFFFFFFFFF` (clés d'usine, lues par la plupart des applis).
 
 ## Installation
 
@@ -81,7 +82,8 @@ python nfc_studio.py --cli classic --out /tmp/dumps     # change le dossier de s
 python nfc_studio.py --cli qidi-tables                  # tables matériaux / couleurs
 python nfc_studio.py --cli qidi-read                     # décode l'étiquette posée
 python nfc_studio.py --cli qidi-write --material PETG-CF --color #FF362D
-python nfc_studio.py --cli qidi-write --material 42 --color 18 --fix-keys
+python nfc_studio.py --cli qidi-write --material 42 --color 18 --fix-keys d3f7
+python nfc_studio.py --cli qidi-write --material 42 --color 18 --fix-keys ffff  # clés d'usine
 ```
 
 `--material` accepte le numéro ou le nom, `--color` le numéro, le nom français ou un `#RRGGBB`.

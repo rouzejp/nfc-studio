@@ -680,6 +680,12 @@ def qidi_lire(conn):
     }
 
 
+JEUX_CLES = {
+    "d3f7": "D3F7D3F7D3F7",
+    "ffff": "FFFFFFFFFFFF",
+}
+
+
 def qidi_ecrire(conn, material, couleur, fabricant=1, corriger_cles=False):
     material = qidi_material_num(material)
     couleur = qidi_color_num(couleur)
@@ -696,9 +702,16 @@ def qidi_ecrire(conn, material, couleur, fabricant=1, corriger_cles=False):
     if sw != SW_OK:
         raise TagError("Écriture du bloc 4 refusée (SW=%04X) — étiquette verrouillée ?" % sw)
     if corriger_cles:
-        # trailer du secteur 1 -> clés D3F7D3F7D3F7 comme les étiquettes d'origine
-        trailer = [0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7, 0xFF, 0x07, 0x80, 0x69,
-                   0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7]
+        # trailer du secteur 1 : clés d'origine QIDI (D3F7) ou clés d'usine (FFFF)
+        jeu = str(corriger_cles).lower()
+        if jeu in ("true", "1", "d3f7"):
+            jeu = "d3f7"
+        elif jeu in ("ffff", "usine", "default"):
+            jeu = "ffff"
+        if jeu not in JEUX_CLES:
+            raise TagError("Jeu de clés inconnu : %s (d3f7 ou ffff)" % corriger_cles)
+        cle_trailer = bytes.fromhex(JEUX_CLES[jeu])
+        trailer = list(cle_trailer) + [0xFF, 0x07, 0x80, 0x69] + list(cle_trailer)
         classic_load_key(conn, cle)
         if not classic_auth(conn, 7, keytype):
             raise TagError("Authentification perdue avant la correction des clés du secteur 1.")
@@ -739,7 +752,8 @@ def cli(argv):
     ap.add_argument("--material", default=None, help="matériau QIDI : numéro (1..50) ou nom (PLA, PETG-CF…)")
     ap.add_argument("--color", default=None, help="couleur QIDI : numéro (1..24), nom (rouge…) ou #RRGGBB")
     ap.add_argument("--manuf", default="1", help="code fabricant QIDI (défaut 1)")
-    ap.add_argument("--fix-keys", action="store_true", help="réécrit les clés du secteur 1 en D3F7D3F7D3F7")
+    ap.add_argument("--fix-keys", nargs="?", const="d3f7", default=None,
+                    help="réécrit le trailer du secteur 1 : d3f7 (défaut) ou ffff")
     a = ap.parse_args(argv)
 
     if a.action == "qidi-tables":
@@ -1134,7 +1148,7 @@ def gui():
                 res["color"], QIDI_COLORS.get(res["color"], ("?", "?"))[1],
                 res["fabricant"], res["brut"]))
             if fix_keys:
-                say("Clés du secteur 1 normalisées en D3F7D3F7D3F7.")
+                say("Trailer du secteur 1 réécrit (jeu de clés %s)." % fix_keys)
         except TagError as e:
             say("ERREUR : %s" % e)
 
@@ -1142,7 +1156,8 @@ def gui():
     btns_qidi.grid(row=3, column=0, columnspan=5, sticky="w", pady=(8, 0))
     ttk.Button(btns_qidi, text="Lire l'étiquette", command=on_qidi_read).grid(row=0, column=0, padx=(0, 6))
     ttk.Button(btns_qidi, text="Écrire", command=lambda: ecrire_qidi(False)).grid(row=0, column=1, padx=(0, 6))
-    ttk.Button(btns_qidi, text="Écrire + clés D3F7", command=lambda: ecrire_qidi(True)).grid(row=0, column=2)
+    ttk.Button(btns_qidi, text="Écrire + clés D3F7", command=lambda: ecrire_qidi("d3f7")).grid(row=0, column=2)
+    ttk.Button(btns_qidi, text="Écrire + clés FFFF", command=lambda: ecrire_qidi("ffff")).grid(row=0, column=3, padx=(6, 0))
 
     def auto_remplir(conn):
         """Remplit les listes avec ce que contient réellement l'étiquette posée."""
