@@ -8,6 +8,12 @@ Lecture et écriture de tags NFC et de cartes MIFARE Classic via PC/SC, avec un 
 
 ![Interface de NFC Studio](screenshots/interface-qidi.png)
 
+**Sommaire** — [Ce que fait l'outil](#ce-que-fait-loutil) · [Installation](#installation) ·
+[Utilisation](#utilisation) · [Prise en main](#prise-en-main-en-cinq-minutes) ·
+[Mode d'emploi de l'interface](#le-mode-demploi-de-linterface) ·
+[Format QIDI](#étiquettes-qidi-box--le-format) · [Sauvegardes](#sauvegardes-de-cartes-mifare-classic) ·
+[Pièges](#pièges-connus) · [Dépannage](#dépannage) · [Licence](#licence-et-transparence)
+
 ## Ce que fait l'outil
 
 **Tags Type 2 / NDEF (NTAG213, NTAG215, NTAG216, MIFARE Ultralight)**
@@ -57,6 +63,20 @@ C:\Users\<vous>\nfc-studio\venv\Scripts\python.exe -m pip install pyscard ndefli
 
 `pyscard` s'installe par wheel, sans compilateur ; `tkinter` est fourni par l'installeur python.org.
 
+Pour lancer d'un double-clic, créer deux fichiers dans le dossier de l'outil :
+
+```bat
+:: nfc-studio-gui.cmd  (sans fenêtre noire)
+@echo off
+"%~dp0venv\Scripts\pythonw.exe" "%~dp0nfc_studio.py"
+
+:: nfc-studio-cli.cmd  (avec console, pour les commandes)
+@echo off
+"%~dp0venv\Scripts\python.exe" "%~dp0nfc_studio.py" %*
+```
+
+Puis clic droit sur `nfc-studio-gui.cmd` → Envoyer vers → Bureau (créer un raccourci).
+
 ## Utilisation
 
 ### Interface graphique
@@ -87,6 +107,43 @@ python nfc_studio.py --cli qidi-write --material 42 --color 18 --fix-keys ffff  
 ```
 
 `--material` accepte le numéro ou le nom, `--color` le numéro, le nom français ou un `#RRGGBB`.
+
+## Prise en main en cinq minutes
+
+1. **Brancher le lecteur.** Aucun pilote sous Windows (CCID natif, service `SCardSvr` actif) ;
+   sous Linux, `pcscd` doit tourner (`sudo systemctl status pcscd`).
+2. **Lancer l'outil.** `python nfc_studio.py` ou, sous Windows, le raccourci du Bureau.
+   La première ligne de la fenêtre affiche le lecteur détecté, la seconde « aucun tag ».
+3. **Poser un tag** sur le lecteur. La ligne du tag passe au modèle et à l'UID ; pour une MIFARE
+   Classic, le journal annonce le type et propose le vidage.
+4. **Lire** ce qu'il contient : bouton « Lire l'étiquette » pour le module QIDI, ou
+   `--cli classic` pour un vidage complet avec sauvegarde.
+5. **Écrire** : choisir matériau, couleur et fabricant dans les trois listes, vérifier la ligne
+   `Bloc 4 : …` qui montre les seize octets, puis « Écrire + clés FFFF ».
+6. **Vérifier** : le journal affiche la demande, puis les octets relus sur la puce. Poser
+   l'étiquette sur la bobine et la présenter à la box.
+
+Si le lecteur n'apparaît pas, voir la section Dépannage : c'est presque toujours une autre
+application qui tient le lecteur, ou une session Windows non interactive.
+
+## Le mode d'emploi de l'interface
+
+| Zone | Ce qu'elle fait |
+|---|---|
+| ligne « Lecteur » / « Tag » | lecteur PC/SC retenu (slot `PICC`, jamais `SAM`) et tag présent |
+| champ Texte / URL | écriture d'un message NDEF texte ou URL sur un tag Type 2 |
+| bouton « Classic : vidage + sauvegarde » | lit les 16 secteurs et écrit les quatre fichiers de sauvegarde |
+| listes Matériau / Couleur / Fabricant | choix QIDI, en lecture seule pour éviter les valeurs libres |
+| pastille colorée | rappel visuel de la couleur choisie |
+| champ « Couleur mesurée » | coller un `#RRGGBB` puis « la plus proche » pour retrouver la teinte QIDI |
+| ligne « Bloc 4 : … » | aperçu en direct des seize octets qui seront écrits |
+| case « signer QIDI » | ajoute `QIDI` dans les octets 12-15, comme l'application Android |
+| boutons Lire / Écrire / Écrire + clés FFFF | lecture, écriture simple, écriture avec remise des clés du secteur 1 en clé d'usine |
+| journal | tout ce qui est fait, avec la demande et la relecture de contrôle |
+
+Deux réflexes de sécurité : l'outil **relit toujours après écriture** et signale une incohérence
+entre la demande et le contenu réel ; et il annule l'écriture si la sélection a changé pendant la
+connexion au tag.
 
 ## Étiquettes QIDI Box : le format
 
@@ -135,6 +192,19 @@ Exemple de rapport : [`docs/exemple-vidage-classic.txt`](docs/exemple-vidage-cla
   n'est pas une carte verrouillée, il manque la séquence `FF 82` (clé) puis `FF 86` (authentification).
 - Windows à mise à l'échelle 150 % : sans conscience du DPI, une fenêtre de 1000 px logiques déborde.
   L'outil déclare son awareness DPI et se recalibre si la résolution change.
+
+## Dépannage
+
+| Symptôme | Cause probable | Solution |
+|---|---|---|
+| `Aucun lecteur PC/SC` | lecteur absent, ou `pcscd` arrêté | rebrancher ; `sudo systemctl restart pcscd` ; `--cli readers` |
+| `Aucun tag sur le lecteur` | tag mal posé ou hors portée | le poser à plat, centré sur l'antenne |
+| `0x80100066` carte ne répond pas | session non interactive, ou autre logiciel qui tient le lecteur | lancer dans la session utilisateur ; fermer NFC Tools et les autres scripts |
+| `6982` à la lecture d'une Classic | authentification manquante | l'outil la fait seul ; vérifier que le tag est bien une Classic (SAK 08/18) |
+| `Aucune clé connue n'ouvre le secteur 1` | étiquette d'une autre marque, ou clé propriétaire | c'est le cas des tags verrouillés : impossible sans la clé |
+| La box ne reconnaît pas l'étiquette | secteur 1 resté en `D3F7`, ou pas de bloc 4 | « Écrire + clés FFFF » puis reposer l'étiquette |
+| Mauvais matériau écrit | sélection perdue (ancienne version) | mettre à jour : chaque sélection et chaque demande sont journalisées |
+| Fenêtre trop grande sous Windows | mise à l'échelle 150 % | version à jour, l'outil est DPI-aware |
 
 ## Licence et transparence
 
