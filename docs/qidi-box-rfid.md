@@ -31,6 +31,11 @@ programme donc en écrivant ce seul bloc.
 
 ## Clés
 
+**Constat de terrain (21/11/2026) : la box n'accepte que les étiquettes dont le secteur 1 est en clé
+d'usine `FFFFFFFFFFFF`.** Trois étiquettes en `D3F7D3F7D3F7` ont été refusées ; repassées en clé
+d'usine, elles sont lues. Écrire donc le trailer en `FFFF` pour un usage réel, `D3F7` n'étant utile
+qu'à imiter une étiquette d'origine pour d'autres outils.
+
 Les outils communautaires essaient `D3F7D3F7D3F7` (clé définie par le NFC Forum pour la zone NDEF
 des MIFARE Classic) puis `FFFFFFFFFFFF` (clé d'usine). Les étiquettes vendues vierges sont en
 général restées en clé d'usine ; les étiquettes d'origine QIDI semblent issues d'une matrice NDEF

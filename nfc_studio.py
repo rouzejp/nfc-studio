@@ -918,8 +918,10 @@ def gui():
             lbl_tag.config(text="%s · UID %s" % (ident["modele"], ident["uid"]))
             say("Tag %s — UID %s" % (ident["modele"], ident["uid"]), clear=True)
             say("MIFARE Classic : bouton « Classic : vidage + sauvegarde » (pas de NDEF ici).")
+            # Le remplissage automatique n'a lieu que sur une LECTURE (read=True).
+            # Sur un chemin d'écriture (read=False) il écraserait la sélection en cours.
             hook = state.get("sur_classic")
-            if hook:
+            if hook and read:
                 hook(conn)
             return conn
         info = tag_info(conn)
@@ -1036,11 +1038,13 @@ def gui():
     qidi.pack(fill="x", padx=8, pady=(0, 8), before=log)
 
     ttk.Label(qidi, text="Matériau :").grid(row=0, column=0, sticky="w")
-    cb_mat = ttk.Combobox(qidi, values=libelles_mat, state="readonly", width=22)
+    cb_mat = ttk.Combobox(qidi, values=libelles_mat, state="readonly", width=22,
+                          height=min(len(libelles_mat), 22))
     cb_mat.grid(row=0, column=1, padx=4, sticky="w")
 
     ttk.Label(qidi, text="Couleur :").grid(row=0, column=2, sticky="w")
-    cb_col = ttk.Combobox(qidi, values=libelles_col, state="readonly", width=24)
+    cb_col = ttk.Combobox(qidi, values=libelles_col, state="readonly", width=24,
+                          height=min(len(libelles_col), 22))
     cb_col.grid(row=0, column=3, padx=4, sticky="w")
     pastille = tk.Label(qidi, text="", width=3, bg="#FFFFFF", relief="solid", bd=1)
     pastille.grid(row=0, column=4, padx=(0, 6))
@@ -1069,6 +1073,11 @@ def gui():
     def num_man():
         texte = cb_man.get()
         return int(texte.split(" · ")[0]) if texte else 1
+
+    def selection_changee(_e=None):
+        """Journalise la sélection réelle : un clic à côté se voit immédiatement."""
+        say("Sélection : %s · %s · %s" % (cb_mat.get(), cb_col.get(), cb_man.get()))
+        maj_apercu()
 
     def maj_apercu(*_a):
         c = num_col()
@@ -1143,7 +1152,7 @@ def gui():
             say("ERREUR : %s" % e)
 
     def ecrire_qidi(fix_keys):
-        m, c = num_mat(), num_col()
+        m, c, man = num_mat(), num_col(), num_man()
         if m is None or c is None:
             say("Choisir un matériau et une couleur dans les listes.")
             return
@@ -1151,7 +1160,15 @@ def gui():
             conn = refresh(read=False)
             if not conn:
                 return
-            res = qidi_ecrire(conn, m, c, num_man(), fix_keys, signature=var_signature.get())
+            # contrôle : la sélection ne doit pas avoir bougé pendant la connexion
+            if (num_mat(), num_col(), num_man()) != (m, c, man):
+                say("La sélection a changé pendant la connexion — écriture annulée, relancer.")
+                return
+            say("Demande : %s / %s / fabricant %s" % (cb_mat.get(), cb_col.get(), cb_man.get()))
+            res = qidi_ecrire(conn, m, c, man, fix_keys, signature=var_signature.get())
+            if (res["material"], res["color"], res["fabricant"]) != (m, c, man):
+                say("INCOHÉRENCE : relu %d/%d/%d alors que la demande était %d/%d/%d" % (
+                    res["material"], res["color"], res["fabricant"], m, c, man))
             say("QIDI écrit : %d (%s) · %d (%s) · fabricant %d — contrôle : %s" % (
                 res["material"], QIDI_MATERIALS.get(res["material"], "?"),
                 res["color"], QIDI_COLORS.get(res["color"], ("?", "?"))[1],
@@ -1168,8 +1185,8 @@ def gui():
                     command=maj_apercu).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
     ttk.Button(btns_qidi, text="Lire l'étiquette", command=on_qidi_read).grid(row=0, column=0, padx=(0, 6))
     ttk.Button(btns_qidi, text="Écrire", command=lambda: ecrire_qidi(False)).grid(row=0, column=1, padx=(0, 6))
-    ttk.Button(btns_qidi, text="Écrire + clés D3F7", command=lambda: ecrire_qidi("d3f7")).grid(row=0, column=2)
-    ttk.Button(btns_qidi, text="Écrire + clés FFFF", command=lambda: ecrire_qidi("ffff")).grid(row=0, column=3, padx=(6, 0))
+    ttk.Button(btns_qidi, text="Écrire + clés FFFF", command=lambda: ecrire_qidi("ffff")).grid(row=0, column=2)
+    ttk.Button(btns_qidi, text="+ clés D3F7", command=lambda: ecrire_qidi("d3f7")).grid(row=0, column=3, padx=(6, 0))
 
     def auto_remplir(conn):
         """Remplit les listes avec ce que contient réellement l'étiquette posée."""
@@ -1191,7 +1208,7 @@ def gui():
 
     state["sur_classic"] = auto_remplir
     for widget in (cb_mat, cb_col, cb_man):
-        widget.bind("<<ComboboxSelected>>", maj_apercu)
+        widget.bind("<<ComboboxSelected>>", selection_changee)
     charger_reglages()
 
     def taille_ecran():

@@ -102,7 +102,9 @@ bloc 4 (secteur 1, bloc 0) :
 Les octets 3 à 11 sont à zéro ; les octets 12 à 15 portent la signature ASCII `QIDI` (`51 49 44 49`)
 sur les étiquettes de l'application Android du même nom, que l'outil reproduit par défaut. Un bloc 4
 entièrement nul signifie « étiquette vierge ».
-Clés rencontrées sur ces étiquettes : `D3F7D3F7D3F7` puis `FFFFFFFFFFFF`.
+Clés rencontrées sur ces étiquettes : `D3F7D3F7D3F7` puis `FFFFFFFFFFFF`. En pratique **la box
+n'accepte que la clé d'usine `FFFFFFFFFFFF`** : une étiquette dont le secteur 1 reste en `D3F7` est
+refusée. Le bouton « Écrire + clés FFFF » règle le cas.
 
 Tables complètes et pièges : [`docs/qidi-box-rfid.md`](docs/qidi-box-rfid.md).
 
