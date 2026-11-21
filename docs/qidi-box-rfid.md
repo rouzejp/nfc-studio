@@ -18,9 +18,16 @@ Trois octets utiles, en tête du **bloc 4** (secteur 1, bloc 0) :
 | 0 | code matériau | 1..50 |
 | 1 | code couleur | 1..24 |
 | 2 | code fabricant | 1 par défaut |
+| 12-15 | signature ASCII `QIDI` | `51 49 44 49` |
 
-Les treize octets suivants sont à zéro. Un bloc 4 entièrement nul correspond à une étiquette vierge.
-Une étiquette vierge du commerce se programme donc en écrivant ce seul bloc.
+Les octets 3 à 11 sont à zéro. Les quatre derniers octets portent `QIDI` en ASCII sur les étiquettes
+écrites par l'application Android « QIDI RFID » : bloc complet `01 06 00 00 00 00 00 00 00 00 00 00
+51 49 44 49` pour un PLA bleu générique. Les outils communautaires (BoxRFID) n'écrivent pas cette
+signature et la box l'accepte : elle n'est donc pas exigée, mais la reproduire rend l'étiquette
+indiscernable de celles de l'application.
+
+Un bloc 4 entièrement nul correspond à une étiquette vierge. Une étiquette vierge du commerce se
+programme donc en écrivant ce seul bloc.
 
 ## Clés
 
@@ -79,6 +86,12 @@ Les codes 9, 10, 15-17, 20-23, 28, 29, 35, 36, 46 et 48 ne sont pas documentés.
 | 10 | #99DEFF bleu clair | 22 | #CAC59F kaki |
 | 11 | #1714B0 bleu foncé | 23 | #F28636 orange |
 | 12 | #CEC0FE lavande | 24 | #B87F2B bronze |
+
+### La signature « QIDI »
+
+L'application Android officieuse écrit `QIDI` dans les octets 12 à 15 du bloc 4. NFC Studio le fait
+par défaut (case à cocher dans l'interface, `--no-signature` en ligne de commande pour s'en passer).
+La lecture signale la présence ou l'absence de cette signature.
 
 ### Changer le jeu de clés (et pourquoi certaines applis échouent)
 

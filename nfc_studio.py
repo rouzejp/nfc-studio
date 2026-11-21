@@ -677,6 +677,7 @@ def qidi_lire(conn):
         "color_nom": QIDI_COLORS.get(couleur, ("?", "?"))[1],
         "brut": toHexString(donnees).replace(" ", ""),
         "vide": material == 0 and couleur == 0,
+        "signature": bytes(donnees[12:16]) == b"QIDI",
     }
 
 
@@ -686,7 +687,7 @@ JEUX_CLES = {
 }
 
 
-def qidi_ecrire(conn, material, couleur, fabricant=1, corriger_cles=False):
+def qidi_ecrire(conn, material, couleur, fabricant=1, corriger_cles=False, signature=True):
     material = qidi_material_num(material)
     couleur = qidi_color_num(couleur)
     if not 0 <= int(fabricant) <= 255:
@@ -694,7 +695,9 @@ def qidi_ecrire(conn, material, couleur, fabricant=1, corriger_cles=False):
     cle, keytype = qidi_trouver_cle(conn)
     if not cle:
         raise TagError("Aucune clé connue n'ouvre le secteur 1 (bloc 4).")
-    charge = [material, couleur, int(fabricant)] + [0x00] * 13
+    # octets 0-2 : matériau, couleur, fabricant ; octets 3-11 : zéros ;
+    # octets 12-15 : « QIDI » en ASCII sur les étiquettes de l'application Android
+    charge = [material, couleur, int(fabricant)] + [0x00] * 9 + (list(b"QIDI") if signature else [0x00] * 4)
     classic_load_key(conn, cle)
     if not classic_auth(conn, QIDI_BLOCK, keytype):
         raise TagError("Authentification perdue avant écriture.")
@@ -752,6 +755,8 @@ def cli(argv):
     ap.add_argument("--material", default=None, help="matériau QIDI : numéro (1..50) ou nom (PLA, PETG-CF…)")
     ap.add_argument("--color", default=None, help="couleur QIDI : numéro (1..24), nom (rouge…) ou #RRGGBB")
     ap.add_argument("--manuf", default="1", help="code fabricant QIDI (défaut 1)")
+    ap.add_argument("--no-signature", action="store_true",
+                    help="ne pas écrire « QIDI » dans les octets 12-15 du bloc 4")
     ap.add_argument("--fix-keys", nargs="?", const="d3f7", default=None,
                     help="réécrit le trailer du secteur 1 : d3f7 (défaut) ou ffff")
     a = ap.parse_args(argv)
@@ -785,12 +790,15 @@ def cli(argv):
                 print("Couleur     : %d — %s (%s)" % (info_q["color"], info_q["color_nom"], info_q["color_hex"]))
                 print("Fabricant   : %d" % info_q["fabricant"])
                 print("Clé secteur : %s %s" % (info_q["type_cle"], info_q["cle"]))
+                print("Signature   : %s" % ("QIDI présente (octets 12-15)" if info_q["signature"]
+                                             else "absente (zéros)"))
                 print("Bloc 4 brut : %s" % info_q["brut"])
             return 0
         if a.action == "qidi-write":
             if a.material is None or a.color is None:
                 raise TagError("Indiquer --material et --color (voir --cli qidi-tables)")
-            res = qidi_ecrire(conn, a.material, a.color, a.manuf, a.fix_keys)
+            res = qidi_ecrire(conn, a.material, a.color, a.manuf, a.fix_keys,
+                              signature=not a.no_signature)
             print("Écrit : matériau %d (%s), couleur %d (%s), fabricant %d" % (
                 res["material"], QIDI_MATERIALS.get(res["material"], "?"),
                 res["color"], QIDI_COLORS.get(res["color"], ("?", "?"))[1], res["fabricant"]))
@@ -1070,7 +1078,8 @@ def gui():
         if m is None or c is None:
             apercu.config(text="Bloc 4 : —")
             return
-        bloc = bytes([m, c, num_man()] + [0x00] * 13).hex(" ")
+        fin = list(b"QIDI") if var_signature.get() else [0x00] * 4
+        bloc = bytes([m, c, num_man()] + [0x00] * 9 + fin).hex(" ")
         apercu.config(text="Bloc 4 : %s" % bloc)
         sauver_reglages(m, c, num_man())
 
@@ -1123,7 +1132,7 @@ def gui():
             say("QIDI : matériau %d (%s) · couleur %d (%s, %s) · fabricant %d · clé %s %s" % (
                 q["material"], q["material_nom"], q["color"], q["color_nom"], q["color_hex"],
                 q["fabricant"], q["type_cle"], q["cle"]))
-            say("Bloc 4 : %s" % q["brut"])
+            say("Bloc 4 : %s — signature %s" % (q["brut"], "QIDI" if q["signature"] else "absente"))
             if q["material"] in QIDI_MATERIALS:
                 cb_mat.set("%02d · %s" % (q["material"], QIDI_MATERIALS[q["material"]]))
             if q["color"] in QIDI_COLORS:
@@ -1142,7 +1151,7 @@ def gui():
             conn = refresh(read=False)
             if not conn:
                 return
-            res = qidi_ecrire(conn, m, c, num_man(), fix_keys)
+            res = qidi_ecrire(conn, m, c, num_man(), fix_keys, signature=var_signature.get())
             say("QIDI écrit : %d (%s) · %d (%s) · fabricant %d — contrôle : %s" % (
                 res["material"], QIDI_MATERIALS.get(res["material"], "?"),
                 res["color"], QIDI_COLORS.get(res["color"], ("?", "?"))[1],
@@ -1154,6 +1163,9 @@ def gui():
 
     btns_qidi = ttk.Frame(qidi)
     btns_qidi.grid(row=3, column=0, columnspan=5, sticky="w", pady=(8, 0))
+    var_signature = tk.BooleanVar(master=root, value=True)
+    ttk.Checkbutton(btns_qidi, text="signer « QIDI » (octets 12-15)", variable=var_signature,
+                    command=maj_apercu).grid(row=1, column=0, columnspan=2, sticky="w", pady=(6, 0))
     ttk.Button(btns_qidi, text="Lire l'étiquette", command=on_qidi_read).grid(row=0, column=0, padx=(0, 6))
     ttk.Button(btns_qidi, text="Écrire", command=lambda: ecrire_qidi(False)).grid(row=0, column=1, padx=(0, 6))
     ttk.Button(btns_qidi, text="Écrire + clés D3F7", command=lambda: ecrire_qidi("d3f7")).grid(row=0, column=2)

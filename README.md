@@ -99,7 +99,9 @@ bloc 4 (secteur 1, bloc 0) :
 | 1 | code couleur | 1..24 |
 | 2 | code fabricant | 1 par défaut |
 
-Les treize octets suivants sont à zéro ; un bloc 4 entièrement nul signifie « étiquette vierge ».
+Les octets 3 à 11 sont à zéro ; les octets 12 à 15 portent la signature ASCII `QIDI` (`51 49 44 49`)
+sur les étiquettes de l'application Android du même nom, que l'outil reproduit par défaut. Un bloc 4
+entièrement nul signifie « étiquette vierge ».
 Clés rencontrées sur ces étiquettes : `D3F7D3F7D3F7` puis `FFFFFFFFFFFF`.
 
 Tables complètes et pièges : [`docs/qidi-box-rfid.md`](docs/qidi-box-rfid.md).
